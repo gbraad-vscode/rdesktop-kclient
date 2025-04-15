@@ -13,7 +13,7 @@
   "displayName": "Kclient Remote Desktop",
   "description": "Remote Desktop Client for developer environments",
   "icon": "img/icon.png",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "engines": {
     "vscode": "^1.98.0"
   },
@@ -23,20 +23,28 @@
   "extensionDependencies": [
     "gbraad.rdesktop-checker"
   ],
-  "activationEvents": [
-    "onCommand:kclient.openRemoteDesktop"
-  ],
   "main": "./dist/extension.js",
+
+  "activationEvents": [
+    "onCommand:extension.openKclientIntegrated",
+    "onCommand:extension.openKclientExternal"
+  ],
   "contributes": {
     "commands": [
       {
-        "command": "kclient.openRemoteDesktop",
-        "title": "Open Kclient Remote Desktop",
+        "command": "extension.openKclientIntegrated",
+        "title": "Open kclient Remote Desktop (Integrated)",
+        "enablement": "rdesktop-checker:isKclientAvailable",
+        "category": "Rdesktop"
+      },
+      {
+        "command": "extension.openKclientExternal",
+        "title": "Open kclient Remote Desktop (External)",
         "enablement": "rdesktop-checker:isKclientAvailable",
         "category": "Rdesktop"
       }
     ]
-  },
+  },  
   "scripts": {
     "vscode:prepublish": "webpack --mode production",
     "compile": "tsc -p ./",

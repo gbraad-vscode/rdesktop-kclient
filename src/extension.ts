@@ -2,25 +2,16 @@ import * as vscode from 'vscode';
 import * as os from 'os';
 
 export function activate(context: vscode.ExtensionContext) {
-    const openRemoteDesktopCommand = vscode.commands.registerCommand('kclient.openRemoteDesktop', async () => {
-        const ips = getNetworkIPs();
-        if (ips.length === 0) {
-            vscode.window.showErrorMessage('No active network devices found.');
-            return;
-        }
-
-        const selectedIP = await vscode.window.showQuickPick(ips, {
-            placeHolder: 'Select the IP address of the network device to use',
-        });
-
-        if (!selectedIP) {
-            vscode.window.showWarningMessage('Operation cancelled. No IP address selected.');
+    const openIntegratedCommand = vscode.commands.registerCommand('extension.openKclientIntegrated', async () => {
+        const ip = await getNetworkDeviceIP();
+        if (!ip) {
+            vscode.window.showErrorMessage('No valid network device IP found. Please check your network configuration.');
             return;
         }
 
         const panel = vscode.window.createWebviewPanel(
             'remoteDesktopClient',
-            'Remote Desktop Client',
+            'kclient Remote Desktop (Integrated)',
             vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -28,25 +19,33 @@ export function activate(context: vscode.ExtensionContext) {
             }
         );
 
-        const url = `https://${selectedIP}:8445`;
+        const url = `https://${ip}:8445`;
 
-        // Embed the webpage in the WebView
         panel.webview.html = getWebViewContent(url);
-
-        // Add convenience button to open externally
-        panel.webview.onDidReceiveMessage((message) => {
-            if (message.command === 'openExternal') {
-                vscode.env.openExternal(vscode.Uri.parse(url));
-            }
-        });
     });
 
-    context.subscriptions.push(openRemoteDesktopCommand);
+    const openExternalCommand = vscode.commands.registerCommand('extension.openKclientExternal', async () => {
+        const ip = await getNetworkDeviceIP();
+        if (!ip) {
+            vscode.window.showErrorMessage('No valid network device IP found. Please check your network configuration.');
+            return;
+        }
+
+        const url = `https://${ip}:8445`;
+        const opened = await vscode.env.openExternal(vscode.Uri.parse(url));
+        if (opened) {
+            vscode.window.showInformationMessage(`Opened kclient Remote Desktop in external browser: ${url}`);
+        } else {
+            vscode.window.showErrorMessage('Failed to open the external browser.');
+        }
+    });
+
+    context.subscriptions.push(openIntegratedCommand, openExternalCommand);
 }
 
 export function deactivate() {}
 
-function getNetworkIPs(): string[] {
+async function getNetworkDeviceIP(): Promise<string | null> {
     const interfaces = os.networkInterfaces();
     const ips: string[] = [];
 
@@ -58,7 +57,15 @@ function getNetworkIPs(): string[] {
         }
     }
 
-    return ips;
+    if (ips.length === 0) {
+        return null;
+    }
+
+    const selectedIP = await vscode.window.showQuickPick(ips, {
+        placeHolder: 'Select the IP address of the network device to use',
+    });
+
+    return selectedIP ?? null;
 }
 
 function getWebViewContent(url: string): string {
@@ -68,7 +75,7 @@ function getWebViewContent(url: string): string {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Remote Desktop Client</title>
+            <title>kclient Remote Desktop</title>
             <style>
                 body {
                     margin: 0;
@@ -81,23 +88,10 @@ function getWebViewContent(url: string): string {
                     flex: 1;
                     border: none;
                 }
-                button {
-                    padding: 10px;
-                    margin: 5px;
-                    font-size: 14px;
-                    cursor: pointer;
-                }
             </style>
         </head>
         <body>
-            <button id="openExternal">Open in External Browser</button>
             <iframe src="${url}" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
-            <script>
-                const vscode = acquireVsCodeApi();
-                document.getElementById('openExternal').addEventListener('click', () => {
-                    vscode.postMessage({ command: 'openExternal' });
-                });
-            </script>
         </body>
         </html>
     `;
